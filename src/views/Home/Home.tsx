@@ -12,54 +12,7 @@ import {
   ContributionTableSkeleton,
   type StockContribution,
 } from "@/components/ContributionTable"
-
-// 模拟数据 - 实际使用时替换为 API 调用
-const mockFundData: FundResultData = {
-  fundCode: "110011",
-  fundName: "易方达中小盘混合",
-  estimatedChange: 1.23,
-  disclosureDate: "2025-12-31",
-  stockPositionRatio: 89.56,
-  updateTime: "2026-01-31 14:35:22",
-}
-
-const mockContributions: StockContribution[] = [
-  {
-    stockCode: "600519",
-    stockName: "贵州茅台",
-    weight: 9.82,
-    change: 2.15,
-    contribution: 0.211,
-  },
-  {
-    stockCode: "000858",
-    stockName: "五粮液",
-    weight: 7.45,
-    change: 1.88,
-    contribution: 0.14,
-  },
-  {
-    stockCode: "000333",
-    stockName: "美的集团",
-    weight: 6.21,
-    change: -0.56,
-    contribution: -0.035,
-  },
-  {
-    stockCode: "601318",
-    stockName: "中国平安",
-    weight: 5.89,
-    change: 0.92,
-    contribution: 0.054,
-  },
-  {
-    stockCode: "600036",
-    stockName: "招商银行",
-    weight: 5.12,
-    change: 1.35,
-    contribution: 0.069,
-  },
-]
+import { getFundRealtimeEstimate } from "@/api/fund"
 
 type QueryState = "idle" | "loading" | "success" | "error"
 
@@ -81,19 +34,36 @@ export default function Home() {
       setQueryState("loading")
       setErrorMessage("")
 
-      // 模拟 API 调用延迟
       try {
-        await new Promise((resolve) => setTimeout(resolve, 1200))
+        const data = await getFundRealtimeEstimate(fundInput.trim())
 
-        // 模拟成功响应
-        setFundData({
-          ...mockFundData,
-          fundCode: fundInput.match(/^\d{6}$/) ? fundInput : mockFundData.fundCode,
-        })
-        setContributions(mockContributions)
+        // 转换 API 响应数据为组件所需格式
+        const fundResult: FundResultData = {
+          fundCode: data.fundCode,
+          fundName: data.fundName,
+          estimatedChange: data.estimatedChange,
+          disclosureDate: data.positionDate,
+          stockPositionRatio: data.totalPositionRatio,
+          updateTime: new Date().toLocaleString("zh-CN"),
+        }
+
+        const contributionList: StockContribution[] = data.contributions.map(
+          (item) => ({
+            stockCode: item.stockCode,
+            stockName: item.stockName,
+            weight: item.ratio,
+            change: item.changePercent,
+            contribution: item.contribution,
+          })
+        )
+
+        setFundData(fundResult)
+        setContributions(contributionList)
         setQueryState("success")
-      } catch {
-        setErrorMessage("查询失败，请稍后重试")
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "查询失败，请稍后重试"
+        setErrorMessage(message)
         setQueryState("error")
       }
     },
