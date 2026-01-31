@@ -1,13 +1,7 @@
-import { Button } from "@/components/ui/button"
-
+import Home from "@/views/Home/Home"
 
 function App() {
-
-  return (
-    <>
-      <Button>Click me</Button>
-    </>
-  )
+  return <Home />
 }
 
 export default App
