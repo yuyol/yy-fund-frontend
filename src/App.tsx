@@ -1,7 +1,12 @@
 import Home from "@/views/Home/Home"
+import { ThemeProvider } from "@/components/ThemeProvider"
 
 function App() {
-  return <Home />
+  return (
+    <ThemeProvider defaultTheme="system" storageKey="yy-fund-theme">
+      <Home />
+    </ThemeProvider>
+  )
 }
 
 export default App
