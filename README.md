@@ -1,73 +1,152 @@
-# React + TypeScript + Vite
+# YY Fund 基金实时涨幅估算
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+一个基于公开持仓数据估算基金实时涨幅的 Web 应用。通过获取基金近几期公开持仓，按股票实时涨跌加权计算，为投资者提供基金的估算实时涨幅参考。
 
-Currently, two official plugins are available:
+## 功能特性
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🔍 **基金查询** - 支持通过基金代码快速查询
+- 📊 **实时估算** - 基于持仓股票实时行情计算估算涨幅
+- 📈 **持仓拆解** - 展示各持仓股票的权重、涨跌及贡献度
+- 🎨 **现代 UI** - 响应式设计，支持深色/浅色主题
+- ⚡ **加载优化** - 骨架屏加载态，提升用户体验
 
-## React Compiler
+## 技术栈
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **框架**: React 19 + TypeScript
+- **构建工具**: Vite 7
+- **样式**: Tailwind CSS 4
+- **UI 组件**: Radix UI + shadcn/ui
+- **HTTP 客户端**: Axios
+- **图标**: Lucide React
 
-## Expanding the ESLint configuration
+## 项目结构
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```
+src/
+├── api/                    # API 接口定义
+│   └── fund.ts             # 基金相关接口
+├── components/             # 组件
+│   ├── ui/                 # 基础 UI 组件 (shadcn/ui)
+│   │   ├── button.tsx
+│   │   ├── card.tsx
+│   │   ├── input.tsx
+│   │   └── skeleton.tsx
+│   ├── ContributionTable.tsx  # 持仓贡献表格
+│   └── FundResult.tsx         # 基金结果展示
+├── lib/                    # 工具库
+│   ├── request.ts          # Axios 封装
+│   └── utils.ts            # 通用工具函数
+├── views/                  # 页面视图
+│   └── Home/               # 首页
+├── App.tsx                 # 应用入口
+├── main.tsx                # 渲染入口
+└── index.css               # 全局样式
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 快速开始
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### 环境要求
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- Node.js >= 18
+- npm >= 9
+
+### 安装依赖
+
+```bash
+npm install
 ```
+
+### 启动开发服务器
+
+```bash
+npm run dev
+```
+
+应用将在 `http://localhost:5173` 启动。
+
+### 构建生产版本
+
+```bash
+npm run build
+```
+
+### 预览生产版本
+
+```bash
+npm run preview
+```
+
+## API 配置
+
+默认 API 地址配置在 `src/lib/request.ts` 中：
+
+```typescript
+const request = axios.create({
+  baseURL: "http://localhost:3000/api",
+  timeout: 10000,
+})
+```
+
+请确保后端服务已启动并运行在对应地址。
+
+## API 接口
+
+### 获取基金实时估算
+
+```
+GET /api/fund/realtime-estimate?code={fundCode}
+```
+
+**响应示例：**
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "fundCode": "110011",
+    "fundName": "易方达中小盘混合",
+    "estimatedChange": 1.25,
+    "totalPositionRatio": 85.5,
+    "positionDate": "2024-06-30",
+    "contributions": [
+      {
+        "stockCode": "600519",
+        "stockName": "贵州茅台",
+        "ratio": 8.5,
+        "changePercent": 2.1,
+        "contribution": 0.178
+      }
+    ]
+  }
+}
+```
+
+## 使用说明
+
+1. 在搜索框中输入基金代码（如 `110011`、`161725`、`005827`）
+2. 点击查询按钮或按回车键
+3. 查看基金的估算实时涨幅和持仓贡献拆解
+
+## 风险提示
+
+⚠️ **重要声明**：
+
+- 本工具提供的涨跌幅为基于公开持仓数据的**估算值**，仅供参考
+- **不构成任何投资建议**
+- 实际净值以基金公司公布为准
+- 持仓数据来源于基金定期报告，可能存在时滞
+- 更适用于 A 股股票型基金，误差可能有浮动，请谨慎参考
+
+## 开发命令
+
+| 命令 | 说明 |
+|------|------|
+| `npm run dev` | 启动开发服务器 |
+| `npm run build` | 构建生产版本 |
+| `npm run preview` | 预览生产版本 |
+| `npm run lint` | 运行 ESLint 检查 |
+
+## License
+
+MIT
