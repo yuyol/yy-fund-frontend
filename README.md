@@ -4,6 +4,13 @@
 
 后端代码入口: https://github.com/yuyol/yy-fund-backend
 
+## demo 页面样例
+
+demo地址: https://yy-fund-frontend.vercel.app/
+
+![demo](./src/assets/images/demo-dark.png)
+![demo](./src/assets/images/demo-light.png)
+
 ## 功能特性
 
 - 🔍 **基金查询** - 支持通过基金代码快速查询
