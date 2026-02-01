@@ -15,7 +15,7 @@ interface ContributionTableProps {
 
 export function ContributionTable({
   data,
-  title = "持仓贡献拆解 Top 5",
+  title = "持仓贡献拆解（其中包含部分猜测持仓，具体持仓以基金公司公布为准）",
 }: ContributionTableProps) {
   return (
     <div className="w-full">

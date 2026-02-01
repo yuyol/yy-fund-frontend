@@ -83,11 +83,12 @@ export default function Home() {
           <div className="inline-flex items-center gap-2 mb-4">
             <TrendingUp className="size-7 text-primary" strokeWidth={2.5} />
             <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
-              基金实时涨幅估算
+              YY Fund 基金实时涨幅估算
             </h1>
           </div>
           <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-lg mx-auto">
-            基于基金最近一期公开持仓，按股票实时涨跌加权计算基金的估算实时涨幅
+            基于基金近几期公开持仓，按股票实时涨跌加权计算基金的估算实时涨幅
+            <span className="ml-2 text-red-600 dark:text-red-400 text-xs align-baseline"> 注意：本工具提供的涨跌幅为基于公开持仓数据的估算值，仅供参考，不构成任何投资建议。（更适用于 A 股股票型基金，误差可能有浮动，请谨慎参考） </span>
           </p>
         </header>
 
