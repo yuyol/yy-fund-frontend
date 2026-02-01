@@ -3,7 +3,7 @@ import axios, { type AxiosResponse, type AxiosError } from "axios"
 // 创建 axios 实例
 const request = axios.create({
   // 根据环境变量选择不同的 baseURL
-  baseURL: process.env.NODE_ENV === "production" ? "https://www.offerace.cn/fund-api/api" : "http://localhost:4000/api",
+  baseURL: import.meta.env.MODE === "production" ? "https://www.offerace.cn/fund-api/api" : "http://localhost:4000/api",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
