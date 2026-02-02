@@ -1,12 +1,99 @@
-import { useState } from "react"
-import { ChevronDown, ChevronUp, AlertCircle, RefreshCw, Plus, X, History, Zap } from "lucide-react"
+import { useState, lazy, Suspense } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import {
-  ContributionTable,
-  type StockContribution,
-} from "@/components/ContributionTable"
+import type { StockContribution } from "@/components/ContributionTable"
+
+// 懒加载 ContributionTable（只有展开时才需要）
+const ContributionTable = lazy(() => import("@/components/ContributionTable").then(m => ({ default: m.ContributionTable })))
+
+// 轻量内联 SVG 图标组件
+const IconChevronDown = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+)
+
+const IconChevronUp = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m18 15-6-6-6 6" />
+  </svg>
+)
+
+const IconAlertCircle = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" />
+  </svg>
+)
+
+const IconRefreshCw = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </svg>
+)
+
+const IconPlus = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M5 12h14" /><path d="M12 5v14" />
+  </svg>
+)
+
+const IconX = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+  </svg>
+)
+
+const IconHistory = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" /><path d="M12 7v5l4 2" />
+  </svg>
+)
+
+const IconZap = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+  </svg>
+)
+
+// ContributionTable 加载骨架屏
+function ContributionTableSkeleton() {
+  return (
+    <div className="w-full">
+      <div className="h-4 w-32 bg-muted animate-pulse rounded mb-4" />
+      <div className="overflow-hidden rounded-lg border border-border/50">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-muted/30">
+              <th className="text-left py-3 px-4"><div className="h-3 w-8 bg-muted animate-pulse rounded" /></th>
+              <th className="text-right py-3 px-4"><div className="h-3 w-12 bg-muted animate-pulse rounded ml-auto" /></th>
+              <th className="text-right py-3 px-4"><div className="h-3 w-12 bg-muted animate-pulse rounded ml-auto" /></th>
+              <th className="text-right py-3 px-4"><div className="h-3 w-8 bg-muted animate-pulse rounded ml-auto" /></th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...Array(5)].map((_, index) => (
+              <tr key={index} className="border-t border-border/30">
+                <td className="py-3 px-4">
+                  <div className="space-y-1">
+                    <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                    <div className="h-3 w-14 bg-muted animate-pulse rounded" />
+                  </div>
+                </td>
+                <td className="text-right py-3 px-4"><div className="h-4 w-12 bg-muted animate-pulse rounded ml-auto" /></td>
+                <td className="text-right py-3 px-4"><div className="h-4 w-14 bg-muted animate-pulse rounded ml-auto" /></td>
+                <td className="text-right py-3 px-4"><div className="h-4 w-14 bg-muted animate-pulse rounded ml-auto" /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
 
 export type FundCardStatus = "idle" | "loading" | "success" | "error"
 export type FundCardZone = "snapshot" | "refresh"
@@ -69,7 +156,7 @@ export function FundCard({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-center justify-center size-10 rounded-lg bg-red-100 dark:bg-red-950/50">
-                <AlertCircle className="size-5 text-red-500" />
+                <IconAlertCircle className="size-5 text-red-500" />
               </div>
               <div>
                 <div className="font-mono text-sm text-muted-foreground">
@@ -91,7 +178,7 @@ export function FundCard({
                   className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
                   title={isRefreshFull ? "刷新区已满（最多5个）" : "加入刷新区"}
                 >
-                  <Plus className="size-4 mr-1" />
+                  <IconPlus className="size-4 mr-1" />
                   加入刷新区
                 </Button>
               )}
@@ -105,7 +192,7 @@ export function FundCard({
                       onClick={onRetry}
                       className="text-muted-foreground hover:text-foreground"
                     >
-                      <RefreshCw className="size-4 mr-1" />
+                      <IconRefreshCw className="size-4 mr-1" />
                       重试
                     </Button>
                   )}
@@ -117,7 +204,7 @@ export function FundCard({
                       className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50"
                       title="从刷新区移除"
                     >
-                      <X className="size-4" />
+                      <IconX className="size-4" />
                     </Button>
                   )}
                 </>
@@ -163,7 +250,7 @@ export function FundCard({
       {isSnapshot && (
         <div className="absolute top-2 left-2 z-10">
           <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
-            <History className="size-2.5" />
+            <IconHistory className="size-2.5" />
             快照
           </span>
         </div>
@@ -171,7 +258,7 @@ export function FundCard({
       {isRefresh && (
         <div className="absolute top-2 left-2 z-10">
           <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100/80 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300">
-            <Zap className="size-2.5" />
+            <IconZap className="size-2.5" />
             可刷新
           </span>
         </div>
@@ -228,9 +315,9 @@ export function FundCard({
             {/* 展开/收起图标 */}
             <div className="flex-shrink-0 text-muted-foreground">
               {isExpanded ? (
-                <ChevronUp className="size-5" />
+                <IconChevronUp className="size-5" />
               ) : (
-                <ChevronDown className="size-5" />
+                <IconChevronDown className="size-5" />
               )}
             </div>
           </button>
@@ -250,7 +337,7 @@ export function FundCard({
                 )}
                 title={isRefreshFull ? "刷新区已满（最多5个）" : "加入刷新区"}
               >
-                <Plus className="size-4" />
+                <IconPlus className="size-4" />
                 <span className="hidden sm:inline ml-1">加入刷新区</span>
               </Button>
             )}
@@ -263,7 +350,7 @@ export function FundCard({
                 className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50"
                 title="从刷新区移除"
               >
-                <X className="size-4" />
+                <IconX className="size-4" />
               </Button>
             )}
           </div>
@@ -284,9 +371,11 @@ export function FundCard({
                 <span>更新：{data.updateTime}</span>
               </div>
 
-              {/* 持仓贡献表格 */}
+              {/* 持仓贡献表格 - 懒加载 */}
               {data.contributions.length > 0 && (
-                <ContributionTable data={data.contributions} />
+                <Suspense fallback={<ContributionTableSkeleton />}>
+                  <ContributionTable data={data.contributions} />
+                </Suspense>
               )}
             </div>
           </div>

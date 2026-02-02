@@ -1,5 +1,4 @@
-import { useState, useCallback, useMemo } from "react"
-import { Search, TrendingUp, Sparkles, AlertTriangle, RefreshCw, History, Zap, Trash2 } from "lucide-react"
+import { useState, useCallback, useMemo, lazy, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import {
@@ -8,8 +7,92 @@ import {
   isValidFundCode,
   type FundRealtimeEstimate,
 } from "@/api/fund"
-import { FundCard, type FundCardData, type FundCardStatus } from "@/components/FundCard"
+import type { FundCardData, FundCardStatus } from "@/components/FundCard"
 import type { StockContribution } from "@/components/ContributionTable"
+
+// 懒加载 FundCard 组件
+const FundCard = lazy(() => import("@/components/FundCard").then(m => ({ default: m.FundCard })))
+
+// 轻量内联 SVG 图标组件（替代 lucide-react 减少包体积）
+const IconSearch = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+  </svg>
+)
+
+const IconTrendingUp = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" />
+  </svg>
+)
+
+const IconSparkles = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    <path d="M5 3v4" /><path d="M19 17v4" /><path d="M3 5h4" /><path d="M17 19h4" />
+  </svg>
+)
+
+const IconAlertTriangle = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+    <path d="M12 9v4" /><path d="M12 17h.01" />
+  </svg>
+)
+
+const IconRefreshCw = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </svg>
+)
+
+const IconHistory = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+    <path d="M3 3v5h5" /><path d="M12 7v5l4 2" />
+  </svg>
+)
+
+const IconZap = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z" />
+  </svg>
+)
+
+const IconTrash2 = ({ className }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /><line x1="10" x2="10" y1="11" y2="17" /><line x1="14" x2="14" y1="11" y2="17" />
+  </svg>
+)
+
+// FundCard 加载占位骨架屏
+function FundCardSkeleton({ code }: { code: string }) {
+  return (
+    <div className="w-full border-0 shadow-md bg-card/80 backdrop-blur-sm overflow-hidden rounded-lg">
+      <div className="p-4 md:p-5">
+        <div className="flex items-center gap-4">
+          <div className="flex-shrink-0 w-20 h-14 md:w-24 md:h-16 rounded-xl bg-muted/50 animate-pulse" />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-2 mb-2">
+              <span className="font-mono text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                {code}
+              </span>
+              <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-20 bg-muted animate-pulse rounded hidden sm:block" />
+            </div>
+          </div>
+          <div className="flex-shrink-0 size-5 bg-muted animate-pulse rounded" />
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // 单个基金的状态
 interface FundState {
@@ -346,11 +429,8 @@ export default function Home() {
         <header className="text-center mb-8 md:mb-12">
           <div className="inline-flex items-center gap-2.5 mb-4">
             <div className="relative">
-              <TrendingUp
-                className="size-8 text-blue-600 dark:text-blue-400"
-                strokeWidth={2.5}
-              />
-              <Sparkles className="absolute -top-1 -right-1 size-3 text-amber-500" />
+              <IconTrendingUp className="size-8 text-blue-600 dark:text-blue-400" />
+              <IconSparkles className="absolute -top-1 -right-1 size-3 text-amber-500" />
             </div>
             <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900 dark:from-white dark:via-blue-200 dark:to-white bg-clip-text text-transparent tracking-tight">
               YY Fund 基金实时涨幅估算
@@ -360,7 +440,7 @@ export default function Home() {
             基于基金近几期公开持仓，按股票实时涨跌加权计算基金的估算实时涨幅
           </p>
           <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 max-w-lg mx-auto">
-            <AlertTriangle className="inline size-3 mr-1 -mt-0.5" />
+            <IconAlertTriangle className="inline size-3 mr-1 -mt-0.5" />
             本工具提供的涨跌幅为估算值，仅供参考，不构成投资建议。适用于 A 股股票型基金，暂不适用于其他例如 ETF，港股，美股等基金。
           </p>
         </header>
@@ -384,7 +464,7 @@ export default function Home() {
                 disabled={isQuerying || validCodes.length === 0}
                 className="h-auto px-5 md:px-6 font-medium bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-500/20"
               >
-                <Search className="size-4 text-white" />
+                <IconSearch className="size-4 text-white" />
                 <span className="hidden sm:inline ml-1 text-white">查询</span>
               </Button>
             </div>
@@ -455,7 +535,7 @@ export default function Home() {
             <div className="flex items-center justify-between px-1 mb-4">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                  <Zap className="size-4" />
+                  <IconZap className="size-4" />
                   <h2 className="text-sm font-semibold">
                     当前刷新区
                   </h2>
@@ -471,7 +551,7 @@ export default function Home() {
                 disabled={isRefreshing || refreshFunds.size === 0}
                 className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-950/50"
               >
-                <RefreshCw className={`size-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                <IconRefreshCw className={`size-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
                 一键刷新
               </Button>
             </div>
@@ -479,7 +559,7 @@ export default function Home() {
             {/* 刷新区说明 */}
             <div className="mb-3 px-3 py-2 rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
               <p className="text-xs text-blue-600 dark:text-blue-400">
-                <Zap className="inline size-3 mr-1 -mt-0.5" />
+                <IconZap className="inline size-3 mr-1 -mt-0.5" />
                 加入刷新区的基金具备实时刷新能力，但不会自动更新。请点击「一键刷新」以获取最新估算数据。最多支持 {MAX_REFRESH_COUNT} 只基金。
               </p>
             </div>
@@ -492,15 +572,17 @@ export default function Home() {
                   className="animate-in fade-in slide-in-from-bottom-2"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <FundCard
-                    code={state.code}
-                    data={state.data}
-                    status={state.status}
-                    errorMessage={state.errorMessage}
-                    onRetry={() => handleRetry(state.code)}
-                    zone="refresh"
-                    onRemoveFromRefresh={() => handleRemoveFromRefresh(state.code)}
-                  />
+                  <Suspense fallback={<FundCardSkeleton code={state.code} />}>
+                    <FundCard
+                      code={state.code}
+                      data={state.data}
+                      status={state.status}
+                      errorMessage={state.errorMessage}
+                      onRetry={() => handleRetry(state.code)}
+                      zone="refresh"
+                      onRemoveFromRefresh={() => handleRemoveFromRefresh(state.code)}
+                    />
+                  </Suspense>
                 </div>
               ))}
             </div>
@@ -514,7 +596,7 @@ export default function Home() {
             <div className="flex items-center justify-between px-1 mb-4">
               <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
-                  <History className="size-4" />
+                  <IconHistory className="size-4" />
                   <h2 className="text-sm font-semibold">
                     历史快照区
                   </h2>
@@ -529,7 +611,7 @@ export default function Home() {
                 onClick={handleClearSnapshots}
                 className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
-                <Trash2 className="size-3.5 mr-1.5" />
+                <IconTrash2 className="size-3.5 mr-1.5" />
                 清空
               </Button>
             </div>
@@ -537,7 +619,7 @@ export default function Home() {
             {/* 快照区说明 */}
             <div className="mb-3 px-3 py-2 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-slate-800/50">
               <p className="text-xs text-muted-foreground">
-                <History className="inline size-3 mr-1 -mt-0.5" />
+                <IconHistory className="inline size-3 mr-1 -mt-0.5" />
                 快照区展示已查询的历史结果，仅供参考，不参与实时刷新。点击「加入刷新区」可将基金移至刷新区，待您手动刷新后获取最新估算结果。
               </p>
             </div>
@@ -550,15 +632,17 @@ export default function Home() {
                   className="animate-in fade-in slide-in-from-bottom-2"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <FundCard
-                    code={state.code}
-                    data={state.data}
-                    status={state.status}
-                    errorMessage={state.errorMessage}
-                    zone="snapshot"
-                    onAddToRefresh={() => handleAddToRefresh(state.code)}
-                    isRefreshFull={isRefreshFull}
-                  />
+                  <Suspense fallback={<FundCardSkeleton code={state.code} />}>
+                    <FundCard
+                      code={state.code}
+                      data={state.data}
+                      status={state.status}
+                      errorMessage={state.errorMessage}
+                      zone="snapshot"
+                      onAddToRefresh={() => handleAddToRefresh(state.code)}
+                      isRefreshFull={isRefreshFull}
+                    />
+                  </Suspense>
                 </div>
               ))}
             </div>
@@ -569,7 +653,7 @@ export default function Home() {
         {isIdle && (
           <div className="text-center py-16">
             <div className="inline-flex items-center justify-center size-20 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200/50 dark:from-slate-800 dark:to-slate-700/50 mb-5 shadow-inner">
-              <Search className="size-8 text-muted-foreground/50" />
+              <IconSearch className="size-8 text-muted-foreground/50" />
             </div>
             <p className="text-muted-foreground text-sm mb-2">
               输入基金代码开始查询
