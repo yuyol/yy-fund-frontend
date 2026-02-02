@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react"
-import { Search, TrendingUp, Sparkles, AlertTriangle } from "lucide-react"
+import { Search, TrendingUp, Sparkles, AlertTriangle, RefreshCw, History, Zap, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ThemeToggle } from "@/components/ThemeToggle"
 import {
@@ -17,12 +17,19 @@ interface FundState {
   status: FundCardStatus
   data?: FundCardData
   errorMessage?: string
+  timestamp: number // 添加时间戳用于排序
 }
+
+const MAX_REFRESH_COUNT = 5
 
 export default function Home() {
   const [fundInput, setFundInput] = useState("")
-  const [fundStates, setFundStates] = useState<Map<string, FundState>>(new Map())
+  // 历史快照区：已查询过的基金，不参与刷新
+  const [snapshotFunds, setSnapshotFunds] = useState<Map<string, FundState>>(new Map())
+  // 当前刷新区：最多5个基金，可实时刷新
+  const [refreshFunds, setRefreshFunds] = useState<Map<string, FundState>>(new Map())
   const [isQuerying, setIsQuerying] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // 解析并校验输入
   const parsedCodes = useMemo(() => parseFundCodes(fundInput), [fundInput])
@@ -34,6 +41,9 @@ export default function Home() {
     () => parsedCodes.filter((code) => isValidFundCode(code)),
     [parsedCodes]
   )
+
+  // 刷新区是否已满
+  const isRefreshFull = refreshFunds.size >= MAX_REFRESH_COUNT
 
   // 转换 API 响应为组件数据
   const transformApiData = (item: FundRealtimeEstimate): FundCardData => {
@@ -60,7 +70,7 @@ export default function Home() {
     }
   }
 
-  // 批量查询
+  // 批量查询（新查询的基金进入快照区）
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
@@ -70,63 +80,137 @@ export default function Home() {
       }
 
       setIsQuerying(true)
+      const timestamp = Date.now()
 
-      // 初始化所有基金为 loading 状态
-      const newStates = new Map<string, FundState>()
+      // 初始化所有基金为 loading 状态（添加到快照区）
+      const newSnapshotStates = new Map(snapshotFunds)
       validCodes.forEach((code) => {
-        newStates.set(code, { code, status: "loading" })
+        // 如果已经在刷新区，跳过
+        if (!refreshFunds.has(code)) {
+          newSnapshotStates.set(code, { code, status: "loading", timestamp })
+        }
       })
-      setFundStates(newStates)
+      setSnapshotFunds(newSnapshotStates)
 
       try {
-        const funds = validCodes.map((code) => ({ code }))
+        // 只查询不在刷新区的基金
+        const codesToQuery = validCodes.filter((code) => !refreshFunds.has(code))
+        if (codesToQuery.length === 0) {
+          setIsQuerying(false)
+          return
+        }
+
+        const funds = codesToQuery.map((code) => ({ code }))
         const results = await getFundRealtimeEstimate(funds)
 
-        // 更新成功的基金状态
-        const updatedStates = new Map<string, FundState>()
-        validCodes.forEach((code) => {
+        // 更新快照区的基金状态
+        const updatedSnapshotStates = new Map(snapshotFunds)
+        codesToQuery.forEach((code) => {
           const result = results.find((r) => r.fundCode === code)
           if (result) {
-            updatedStates.set(code, {
+            updatedSnapshotStates.set(code, {
               code,
               status: "success",
               data: transformApiData(result),
+              timestamp,
             })
           } else {
-            updatedStates.set(code, {
+            updatedSnapshotStates.set(code, {
               code,
               status: "error",
               errorMessage: "未找到该基金数据",
+              timestamp,
             })
           }
         })
-        setFundStates(updatedStates)
+        setSnapshotFunds(updatedSnapshotStates)
       } catch (error) {
         // 整体请求失败，所有基金标记为错误
         const errorMessage =
           error instanceof Error ? error.message : "查询失败，请稍后重试"
-        const errorStates = new Map<string, FundState>()
+        const errorStates = new Map(snapshotFunds)
         validCodes.forEach((code) => {
-          errorStates.set(code, {
-            code,
-            status: "error",
-            errorMessage,
-          })
+          if (!refreshFunds.has(code)) {
+            errorStates.set(code, {
+              code,
+              status: "error",
+              errorMessage,
+              timestamp,
+            })
+          }
         })
-        setFundStates(errorStates)
+        setSnapshotFunds(errorStates)
       } finally {
         setIsQuerying(false)
       }
     },
-    [validCodes]
+    [validCodes, snapshotFunds, refreshFunds]
   )
 
-  // 单个基金重试
+  // 刷新区一键刷新
+  const handleRefreshAll = useCallback(async () => {
+    if (refreshFunds.size === 0) return
+
+    setIsRefreshing(true)
+    const timestamp = Date.now()
+
+    // 设置所有刷新区基金为 loading
+    const loadingStates = new Map<string, FundState>()
+    refreshFunds.forEach((state, code) => {
+      loadingStates.set(code, { ...state, status: "loading", timestamp })
+    })
+    setRefreshFunds(loadingStates)
+
+    try {
+      const codes = Array.from(refreshFunds.keys())
+      const funds = codes.map((code) => ({ code }))
+      const results = await getFundRealtimeEstimate(funds)
+
+      const updatedStates = new Map<string, FundState>()
+      codes.forEach((code) => {
+        const result = results.find((r) => r.fundCode === code)
+        const prevState = refreshFunds.get(code)
+        if (result) {
+          updatedStates.set(code, {
+            code,
+            status: "success",
+            data: transformApiData(result),
+            timestamp: prevState?.timestamp || timestamp,
+          })
+        } else {
+          updatedStates.set(code, {
+            code,
+            status: "error",
+            errorMessage: "未找到该基金数据",
+            timestamp: prevState?.timestamp || timestamp,
+          })
+        }
+      })
+      setRefreshFunds(updatedStates)
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "刷新失败，请稍后重试"
+      const errorStates = new Map<string, FundState>()
+      refreshFunds.forEach((state, code) => {
+        errorStates.set(code, {
+          ...state,
+          status: "error",
+          errorMessage,
+        })
+      })
+      setRefreshFunds(errorStates)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [refreshFunds])
+
+  // 单个基金重试（仅刷新区）
   const handleRetry = useCallback(
     async (code: string) => {
-      setFundStates((prev) => {
+      setRefreshFunds((prev) => {
         const newStates = new Map(prev)
-        newStates.set(code, { code, status: "loading" })
+        const prevState = prev.get(code)
+        newStates.set(code, { code, status: "loading", timestamp: prevState?.timestamp || Date.now() })
         return newStates
       })
 
@@ -134,19 +218,22 @@ export default function Home() {
         const results = await getFundRealtimeEstimate([{ code }])
         const result = results.find((r) => r.fundCode === code)
 
-        setFundStates((prev) => {
+        setRefreshFunds((prev) => {
           const newStates = new Map(prev)
+          const prevState = prev.get(code)
           if (result) {
             newStates.set(code, {
               code,
               status: "success",
               data: transformApiData(result),
+              timestamp: prevState?.timestamp || Date.now(),
             })
           } else {
             newStates.set(code, {
               code,
               status: "error",
               errorMessage: "未找到该基金数据",
+              timestamp: prevState?.timestamp || Date.now(),
             })
           }
           return newStates
@@ -154,12 +241,14 @@ export default function Home() {
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : "查询失败，请稍后重试"
-        setFundStates((prev) => {
+        setRefreshFunds((prev) => {
           const newStates = new Map(prev)
+          const prevState = prev.get(code)
           newStates.set(code, {
             code,
             status: "error",
             errorMessage,
+            timestamp: prevState?.timestamp || Date.now(),
           })
           return newStates
         })
@@ -168,20 +257,75 @@ export default function Home() {
     []
   )
 
+  // 从快照区加入刷新区
+  const handleAddToRefresh = useCallback((code: string) => {
+    if (refreshFunds.size >= MAX_REFRESH_COUNT) return
+
+    const snapshotState = snapshotFunds.get(code)
+    if (!snapshotState) return
+
+    // 从快照区移除
+    setSnapshotFunds((prev) => {
+      const newStates = new Map(prev)
+      newStates.delete(code)
+      return newStates
+    })
+
+    // 添加到刷新区
+    setRefreshFunds((prev) => {
+      const newStates = new Map(prev)
+      newStates.set(code, { ...snapshotState, timestamp: Date.now() })
+      return newStates
+    })
+  }, [snapshotFunds, refreshFunds.size])
+
+  // 从刷新区移除（移回快照区）
+  const handleRemoveFromRefresh = useCallback((code: string) => {
+    const refreshState = refreshFunds.get(code)
+    if (!refreshState) return
+
+    // 从刷新区移除
+    setRefreshFunds((prev) => {
+      const newStates = new Map(prev)
+      newStates.delete(code)
+      return newStates
+    })
+
+    // 添加回快照区
+    setSnapshotFunds((prev) => {
+      const newStates = new Map(prev)
+      newStates.set(code, { ...refreshState, timestamp: Date.now() })
+      return newStates
+    })
+  }, [refreshFunds])
+
+  // 清空快照区
+  const handleClearSnapshots = useCallback(() => {
+    setSnapshotFunds(new Map())
+  }, [])
+
   // 示例点击
   const handleExampleClick = (codes: string) => {
     setFundInput(codes)
   }
 
   // 获取有序的基金状态列表
-  const orderedFundStates = useMemo(() => {
+  const orderedRefreshFunds = useMemo(() => {
     const states: FundState[] = []
-    fundStates.forEach((state) => states.push(state))
-    return states
-  }, [fundStates])
+    refreshFunds.forEach((state) => states.push(state))
+    return states.sort((a, b) => a.timestamp - b.timestamp)
+  }, [refreshFunds])
 
-  const hasResults = orderedFundStates.length > 0
-  const isIdle = !hasResults && !isQuerying
+  const orderedSnapshotFunds = useMemo(() => {
+    const states: FundState[] = []
+    snapshotFunds.forEach((state) => states.push(state))
+    return states.sort((a, b) => b.timestamp - a.timestamp) // 最新的在前
+  }, [snapshotFunds])
+
+  const hasRefreshResults = orderedRefreshFunds.length > 0
+  const hasSnapshotResults = orderedSnapshotFunds.length > 0
+  const hasAnyResults = hasRefreshResults || hasSnapshotResults
+  const isIdle = !hasAnyResults && !isQuerying
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -304,36 +448,121 @@ export default function Home() {
           </div>
         </form>
 
-        {/* 结果展示区 */}
-        {hasResults && (
-          <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* 结果统计 */}
+        {/* 当前刷新区 */}
+        {hasRefreshResults && (
+          <section className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* 刷新区标题栏 */}
             <div className="flex items-center justify-between px-1 mb-4">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                查询结果（{orderedFundStates.length} 只基金）
-              </h2>
-              <span className="text-xs text-muted-foreground/70">
-                点击卡片展开持仓详情
-              </span>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                  <Zap className="size-4" />
+                  <h2 className="text-sm font-semibold">
+                    当前刷新区
+                  </h2>
+                </div>
+                <span className="text-xs text-muted-foreground bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 rounded-full">
+                  {refreshFunds.size}/{MAX_REFRESH_COUNT}
+                </span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshAll}
+                disabled={isRefreshing || refreshFunds.size === 0}
+                className="text-blue-600 border-blue-200 hover:bg-blue-50 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-950/50"
+              >
+                <RefreshCw className={`size-3.5 mr-1.5 ${isRefreshing ? "animate-spin" : ""}`} />
+                一键刷新
+              </Button>
             </div>
 
-            {/* 基金卡片列表 */}
-            {orderedFundStates.map((state, index) => (
-              <div
-                key={state.code}
-                className="animate-in fade-in slide-in-from-bottom-2"
-                style={{ animationDelay: `${index * 100}ms` }}
-              >
-                <FundCard
-                  code={state.code}
-                  data={state.data}
-                  status={state.status}
-                  errorMessage={state.errorMessage}
-                  onRetry={() => handleRetry(state.code)}
-                />
+            {/* 刷新区说明 */}
+            <div className="mb-3 px-3 py-2 rounded-lg bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                <Zap className="inline size-3 mr-1 -mt-0.5" />
+                加入刷新区的基金具备实时刷新能力，但不会自动更新。请点击「一键刷新」以获取最新估算数据。最多支持 {MAX_REFRESH_COUNT} 只基金。
+              </p>
+            </div>
+
+            {/* 刷新区基金卡片 */}
+            <div className="space-y-3">
+              {orderedRefreshFunds.map((state, index) => (
+                <div
+                  key={state.code}
+                  className="animate-in fade-in slide-in-from-bottom-2"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <FundCard
+                    code={state.code}
+                    data={state.data}
+                    status={state.status}
+                    errorMessage={state.errorMessage}
+                    onRetry={() => handleRetry(state.code)}
+                    zone="refresh"
+                    onRemoveFromRefresh={() => handleRemoveFromRefresh(state.code)}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* 历史快照区 */}
+        {hasSnapshotResults && (
+          <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* 快照区标题栏 */}
+            <div className="flex items-center justify-between px-1 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
+                  <History className="size-4" />
+                  <h2 className="text-sm font-semibold">
+                    历史快照区
+                  </h2>
+                </div>
+                <span className="text-xs text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
+                  {snapshotFunds.size} 只
+                </span>
               </div>
-            ))}
-          </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleClearSnapshots}
+                className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+              >
+                <Trash2 className="size-3.5 mr-1.5" />
+                清空
+              </Button>
+            </div>
+
+            {/* 快照区说明 */}
+            <div className="mb-3 px-3 py-2 rounded-lg bg-slate-50/50 dark:bg-slate-900/30 border border-slate-200/50 dark:border-slate-800/50">
+              <p className="text-xs text-muted-foreground">
+                <History className="inline size-3 mr-1 -mt-0.5" />
+                快照区展示已查询的历史结果，仅供参考，不参与实时刷新。点击「加入刷新区」可将基金移至刷新区，待您手动刷新后获取最新估算结果。
+              </p>
+            </div>
+
+            {/* 快照区基金卡片 */}
+            <div className="space-y-3">
+              {orderedSnapshotFunds.map((state, index) => (
+                <div
+                  key={state.code}
+                  className="animate-in fade-in slide-in-from-bottom-2"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
+                  <FundCard
+                    code={state.code}
+                    data={state.data}
+                    status={state.status}
+                    errorMessage={state.errorMessage}
+                    zone="snapshot"
+                    onAddToRefresh={() => handleAddToRefresh(state.code)}
+                    isRefreshFull={isRefreshFull}
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* 空状态提示 */}
@@ -346,7 +575,7 @@ export default function Home() {
               输入基金代码开始查询
             </p>
             <p className="text-muted-foreground/60 text-xs">
-              支持同时查询多只基金，快速对比估算涨幅
+              查询结果将进入历史快照区，可挑选加入刷新区进行实时监控
             </p>
           </div>
         )}

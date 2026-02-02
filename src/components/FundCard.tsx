@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { ChevronDown, ChevronUp, AlertCircle, RefreshCw } from "lucide-react"
+import { ChevronDown, ChevronUp, AlertCircle, RefreshCw, Plus, X, History, Zap } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -9,6 +9,7 @@ import {
 } from "@/components/ContributionTable"
 
 export type FundCardStatus = "idle" | "loading" | "success" | "error"
+export type FundCardZone = "snapshot" | "refresh"
 
 export interface FundCardData {
   fundCode: string
@@ -26,6 +27,14 @@ interface FundCardProps {
   status: FundCardStatus
   errorMessage?: string
   onRetry?: () => void
+  // 新增：区分快照区和刷新区
+  zone?: FundCardZone
+  // 新增：加入刷新区操作
+  onAddToRefresh?: () => void
+  // 新增：从刷新区移除操作
+  onRemoveFromRefresh?: () => void
+  // 新增：刷新区是否已满
+  isRefreshFull?: boolean
 }
 
 export function FundCard({
@@ -34,8 +43,15 @@ export function FundCard({
   status,
   errorMessage,
   onRetry,
+  zone = "refresh",
+  onAddToRefresh,
+  onRemoveFromRefresh,
+  isRefreshFull = false,
 }: FundCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+
+  const isSnapshot = zone === "snapshot"
+  const isRefresh = zone === "refresh"
 
   // 加载中状态
   if (status === "loading") {
@@ -45,7 +61,10 @@ export function FundCard({
   // 错误状态
   if (status === "error") {
     return (
-      <Card className="w-full border-0 shadow-md bg-card/80 backdrop-blur-sm overflow-hidden">
+      <Card className={cn(
+        "w-full border-0 shadow-md bg-card/80 backdrop-blur-sm overflow-hidden",
+        isSnapshot && "opacity-80"
+      )}>
         <CardContent className="p-4 md:p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -61,17 +80,49 @@ export function FundCard({
                 </div>
               </div>
             </div>
-            {onRetry && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onRetry}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                <RefreshCw className="size-4 mr-1" />
-                重试
-              </Button>
-            )}
+            <div className="flex items-center gap-2">
+              {/* 快照区：加入刷新区按钮 */}
+              {isSnapshot && onAddToRefresh && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onAddToRefresh}
+                  disabled={isRefreshFull}
+                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50"
+                  title={isRefreshFull ? "刷新区已满（最多5个）" : "加入刷新区"}
+                >
+                  <Plus className="size-4 mr-1" />
+                  加入刷新区
+                </Button>
+              )}
+              {/* 刷新区：重试和移除按钮 */}
+              {isRefresh && (
+                <>
+                  {onRetry && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onRetry}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <RefreshCw className="size-4 mr-1" />
+                      重试
+                    </Button>
+                  )}
+                  {onRemoveFromRefresh && (
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      onClick={onRemoveFromRefresh}
+                      className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50"
+                      title="从刷新区移除"
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -103,64 +154,120 @@ export function FundCard({
   return (
     <Card
       className={cn(
-        "w-full border-0 shadow-md bg-card/80 backdrop-blur-sm overflow-hidden transition-all duration-300",
-        isExpanded && "shadow-lg"
+        "w-full border-0 shadow-md bg-card/80 backdrop-blur-sm overflow-hidden transition-all duration-300 relative",
+        isExpanded && "shadow-lg",
+        isSnapshot && "opacity-85 hover:opacity-100"
       )}
     >
+      {/* 区域标识 - 放在卡片顶部 */}
+      {isSnapshot && (
+        <div className="absolute top-2 left-2 z-10">
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200/80 dark:bg-slate-700/80 text-slate-600 dark:text-slate-300">
+            <History className="size-2.5" />
+            快照
+          </span>
+        </div>
+      )}
+      {isRefresh && (
+        <div className="absolute top-2 left-2 z-10">
+          <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100/80 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300">
+            <Zap className="size-2.5" />
+            可刷新
+          </span>
+        </div>
+      )}
+
       <CardContent className="p-0">
         {/* 卡片头部 - 可点击展开/收起 */}
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="w-full p-4 md:p-5 flex items-center gap-4 hover:bg-muted/30 transition-colors text-left"
-        >
-          {/* 涨跌幅指示器 */}
-          <div
-            className={cn(
-              "flex-shrink-0 flex items-center justify-center w-20 h-14 md:w-24 md:h-16 rounded-xl",
-              changeBgColor
-            )}
+        <div className="w-full p-4 md:p-5 flex items-center gap-4 text-left pt-8">
+
+          {/* 可点击区域 - 展开/收起 */}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center gap-4 flex-1 min-w-0 hover:bg-muted/30 -m-4 p-4 rounded-lg transition-colors"
           >
-            <span
+            {/* 涨跌幅指示器 */}
+            <div
               className={cn(
-                "font-mono text-xl md:text-2xl font-bold tracking-tight",
-                changeColor
+                "flex-shrink-0 flex items-center justify-center w-20 h-14 md:w-24 md:h-16 rounded-xl",
+                changeBgColor
               )}
             >
-              {sign}
-              {data.estimatedChange.toFixed(2)}%
-            </span>
-          </div>
-
-          {/* 基金信息 */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="font-mono text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
-                {data.fundCode}
-              </span>
-              <h3 className="text-sm md:text-base font-medium text-foreground truncate">
-                {data.fundName}
-              </h3>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>仓位 {data.totalPositionRatio.toFixed(1)}%</span>
-              <span className="hidden sm:inline">·</span>
-              <span className="hidden sm:inline">{data.positionDate}</span>
-              <span className="hidden md:inline">·</span>
-              <span className="hidden md:inline text-muted-foreground/70">
-                更新于 {data.updateTime}
+              <span
+                className={cn(
+                  "font-mono text-xl md:text-2xl font-bold tracking-tight",
+                  changeColor
+                )}
+              >
+                {sign}
+                {data.estimatedChange.toFixed(2)}%
               </span>
             </div>
-          </div>
 
-          {/* 展开/收起图标 */}
-          <div className="flex-shrink-0 text-muted-foreground">
-            {isExpanded ? (
-              <ChevronUp className="size-5" />
-            ) : (
-              <ChevronDown className="size-5" />
+            {/* 基金信息 */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="font-mono text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                  {data.fundCode}
+                </span>
+                <h3 className="text-sm md:text-base font-medium text-foreground truncate">
+                  {data.fundName}
+                </h3>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span>仓位 {data.totalPositionRatio.toFixed(1)}%</span>
+                <span className="hidden sm:inline">·</span>
+                <span className="hidden sm:inline">{data.positionDate}</span>
+                <span className="hidden md:inline">·</span>
+                <span className="hidden md:inline text-muted-foreground/70">
+                  更新于 {data.updateTime}
+                </span>
+              </div>
+            </div>
+
+            {/* 展开/收起图标 */}
+            <div className="flex-shrink-0 text-muted-foreground">
+              {isExpanded ? (
+                <ChevronUp className="size-5" />
+              ) : (
+                <ChevronDown className="size-5" />
+              )}
+            </div>
+          </button>
+
+          {/* 操作按钮区域 */}
+          <div className="flex-shrink-0 flex items-center gap-1">
+            {/* 快照区：加入刷新区按钮 */}
+            {isSnapshot && onAddToRefresh && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onAddToRefresh}
+                disabled={isRefreshFull}
+                className={cn(
+                  "text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/50",
+                  isRefreshFull && "opacity-50 cursor-not-allowed"
+                )}
+                title={isRefreshFull ? "刷新区已满（最多5个）" : "加入刷新区"}
+              >
+                <Plus className="size-4" />
+                <span className="hidden sm:inline ml-1">加入刷新区</span>
+              </Button>
+            )}
+            {/* 刷新区：移除按钮 */}
+            {isRefresh && onRemoveFromRefresh && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onRemoveFromRefresh}
+                className="text-muted-foreground hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/50"
+                title="从刷新区移除"
+              >
+                <X className="size-4" />
+              </Button>
             )}
           </div>
-        </button>
+        </div>
 
         {/* 展开的详情内容 */}
         <div
