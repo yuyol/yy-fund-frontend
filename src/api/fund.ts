@@ -19,18 +19,48 @@ export interface FundRealtimeEstimate {
   contributions: ContributionItem[] // 持仓贡献详情
 }
 
+// 批量查询请求参数
+export interface FundQueryItem {
+  code: string
+}
+
 /**
- * 获取基金实时估算涨幅
- * @param code 基金代码
+ * 批量获取基金实时估算涨幅
+ * @param funds 基金代码列表
  */
 export async function getFundRealtimeEstimate(
-  code: string
-): Promise<FundRealtimeEstimate> {
-  const response = await request.get<ApiResponse<FundRealtimeEstimate>>(
+  funds: FundQueryItem[]
+): Promise<FundRealtimeEstimate[]> {
+  const response = await request.post<ApiResponse<FundRealtimeEstimate[]>>(
     "/fund/realtime-estimate",
-    {
-      params: { code },
-    }
+    { funds }
   )
   return response.data.data
+}
+
+/**
+ * 解析用户输入的基金代码字符串
+ * 支持空格、逗号、斜杠分隔
+ * @param input 用户输入
+ * @returns 基金代码数组（去重，最多5个）
+ */
+export function parseFundCodes(input: string): string[] {
+  const codes = input
+    .split(/[\s,，/、]+/)
+    .map((code) => code.trim())
+    .filter((code) => code.length > 0)
+  
+  // 去重并限制最多5个
+  const uniqueCodes = [...new Set(codes)]
+  return uniqueCodes.slice(0, 5)
+}
+
+/**
+ * 校验基金代码格式
+ * @param code 基金代码
+ * @returns 是否有效
+ */
+export function isValidFundCode(code: string): boolean {
+  // 基金代码通常为6位数字
+  return /^\d{6}$/.test(code)
 }
