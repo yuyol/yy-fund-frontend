@@ -104,7 +104,7 @@ export default function Home() {
             <div className="flex-1 relative">
               <Input
                 type="text"
-                placeholder="输入基金代码或名称，如 110011"
+                placeholder="输入基金代码或名称，如 018125"
                 value={fundInput}
                 onChange={(e) => setFundInput(e.target.value)}
                 className="pr-4 h-12 text-base bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
@@ -126,18 +126,18 @@ export default function Home() {
             <span>示例：</span>
             <button
               type="button"
-              onClick={() => handleExampleClick("110011")}
+              onClick={() => handleExampleClick("018125")}
               className="font-mono hover:text-foreground transition-colors underline underline-offset-2"
             >
-              110011
+              018125
             </button>
             <span>·</span>
             <button
               type="button"
-              onClick={() => handleExampleClick("161725")}
+              onClick={() => handleExampleClick("022364")}
               className="font-mono hover:text-foreground transition-colors underline underline-offset-2"
             >
-              161725
+              022364
             </button>
             <span>·</span>
             <button
